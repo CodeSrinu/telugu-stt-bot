@@ -1,37 +1,45 @@
-import subprocess
-import json
+from flask import Flask, request, jsonify
+import requests
+from pydub import AudioSegment
 import io
-from google.cloud import speech_v1p1beta1 as speech
+import os
+from google.cloud import speech
 
-def get_sample_rate(file_path):
-    cmd = [
-        'ffprobe', '-v', 'error', '-select_streams', 'a:0',
-        '-show_entries', 'stream=sample_rate',
-        '-of', 'json', file_path
-    ]
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    rate = json.loads(result.stdout)['streams'][0]['sample_rate']
-    return int(rate)
+app = Flask(__name__)
 
-def transcribe_audio(file_path):
-    sample_rate = get_sample_rate(file_path)
-    client = speech.SpeechClient()
-    
-    with io.open(file_path, "rb") as audio_file:
-        content = audio_file.read()
+@app.route('/transcribe-audio', methods=['POST'])
+def transcribe_audio():
+    url = request.args.get('url')
+    if not url:
+        return jsonify({'error': 'No audio URL provided'}), 400
 
-    audio = speech.RecognitionAudio(content=content)
-    config = speech.RecognitionConfig(
-        encoding=speech.RecognitionConfig.AudioEncoding.OGG_OPUS,
-        sample_rate_hertz=sample_rate,
-        language_code="te-IN",
-        audio_channel_count=1
-    )
+    # WhatsApp API token
+    token = os.environ.get('WHATSAPP_API_TOKEN')
+    headers = {"Authorization": f"Bearer {token}"}
 
-    response = client.recognize(config=config, audio=audio)
-    
-    transcript = ""
-    for result in response.results:
-        transcript += result.alternatives[0].transcript
+    try:
+        audio_response = requests.get(url, headers=headers)
+        if audio_response.status_code != 200:
+            return jsonify({'error': 'Failed to download audio'}), 400
 
-    return transcript
+        # Convert OGG to FLAC
+        audio = AudioSegment.from_file(io.BytesIO(audio_response.content), format="ogg")
+        flac_io = io.BytesIO()
+        audio.export(flac_io, format="flac")
+        flac_io.seek(0)
+
+        # Transcribe with Google STT
+        client = speech.SpeechClient()
+        audio = speech.RecognitionAudio(content=flac_io.read())
+        config = speech.RecognitionConfig(
+            encoding=speech.RecognitionConfig.AudioEncoding.FLAC,
+            sample_rate_hertz=16000,
+            language_code="te-IN"
+        )
+
+        response = client.recognize(config=config, audio=audio)
+        transcript = response.results[0].alternatives[0].transcript if response.results else ''
+        return jsonify({"transcript": transcript})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

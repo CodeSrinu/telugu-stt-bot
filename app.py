@@ -4,6 +4,8 @@ from transcriber import transcribe_audio
 import os
 
 app = Flask(__name__)
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/etc/secrets/google-credentials.json"
+
 
 @app.route('/transcribe-audio', methods=['POST'])
 def transcribe_audio_route():

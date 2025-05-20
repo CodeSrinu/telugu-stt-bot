@@ -22,7 +22,7 @@ def transcribe_audio(file_path):
 
     audio = speech.RecognitionAudio(content=content)
     config = speech.RecognitionConfig(
-        encoding=speech.RecognitionConfig.AudioEncoding.FLAC,
+        encoding=speech.RecognitionConfig.AudioEncoding.OGG_OPUS,
         sample_rate_hertz=sample_rate,
         language_code="te-IN",
         audio_channel_count=1

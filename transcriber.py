@@ -15,7 +15,7 @@ def transcribe_audio(file_path):
     audio = speech.RecognitionAudio(content=flac_io.read())
     config = speech.RecognitionConfig(
         encoding=speech.RecognitionConfig.AudioEncoding.FLAC,
-        sample_rate_hertz=16000,
+        sample_rate_hertz=48000,
         language_code="te-IN"
     )
 
